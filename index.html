@@ -4,12 +4,135 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>仕入れ判定</title>
+
   <link rel="manifest" href="./manifest.webmanifest">
   <meta name="theme-color" content="#111111">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+
+  <style>
+    :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", sans-serif; }
+    body { margin: 0; background:#0b0b0b; color:#f2f2f2; }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 16px; }
+    h1 { font-size: 18px; margin: 8px 0 16px; }
+    .card { background:#151515; border:1px solid #2a2a2a; border-radius:14px; padding:14px; margin: 12px 0; }
+    label { display:block; font-size: 12px; opacity:.85; margin: 10px 0 6px; }
+    input, select { width:100%; padding:12px; border-radius:12px; border:1px solid #303030; background:#0f0f0f; color:#f2f2f2; font-size:16px; box-sizing:border-box; }
+    .row { display:flex; gap:10px; }
+    .row > div { flex: 1; }
+    .btnrow { display:flex; gap:10px; flex-wrap: wrap; margin-top: 10px; }
+    button { padding:12px 14px; border-radius:12px; border:1px solid #303030; background:#1f1f1f; color:#fff; font-size:15px; cursor:pointer; }
+    button.primary { background:#2b62ff; border-color:#2b62ff; }
+    button.ghost { background:transparent; }
+    button.small { padding:9px 10px; font-size:14px; }
+    .pill { display:inline-flex; align-items:center; gap:8px; padding:10px 12px; border-radius:999px; font-weight:700; }
+    .go { background:#0f3; color:#001a05; }
+    .hold { background:#ff0; color:#1a1600; }
+    .no { background:#f33; color:#1a0000; }
+    .muted { opacity:.75; font-size: 13px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .list { display:flex; flex-direction:column; gap:10px; margin-top: 10px; }
+    .item { padding:12px; border:1px solid #2a2a2a; border-radius:14px; background:#111; }
+    .itemtop { display:flex; justify-content:space-between; gap:12px; }
+    .itemtitle { font-weight:700; }
+    .tags { display:flex; gap:8px; flex-wrap: wrap; margin-top: 6px; }
+    .tag { font-size: 12px; padding:6px 10px; background:#1b1b1b; border:1px solid #2a2a2a; border-radius:999px; }
+    .danger { color:#ff8a8a; }
+    details { margin-top: 8px; }
+    summary { cursor:pointer; opacity:.9; }
+  </style>
 </head>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#111;color:#fff;padding:20px;">
-  <h1>📚 仕入れ判定（iPhone完結）</h1>
-  <p>ZIP版サンプルが正常に配置されています。</p>
-  <p>このファイルをGitHub Pagesにアップロードしてください。</p>
+<body>
+  <div class="wrap">
+    <h1>📚 仕入れ判定（iPhone完結）</h1>
+
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>題名（推奨）</label>
+          <input id="title" placeholder="例：ノンタン おやすみなさい" />
+        </div>
+        <div>
+          <label>ISBN（任意）</label>
+          <input id="isbn" placeholder="978..." inputmode="numeric" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>仕入れ合計（円）</label>
+          <input id="cost" placeholder="例：220" inputmode="numeric" />
+        </div>
+        <div>
+          <label>状態</label>
+          <select id="condition">
+            <option value="A">A（良）</option>
+            <option value="B" selected>B（並）</option>
+            <option value="C">C（難）</option>
+          </select>
+        </div>
+      </div>
+
+      <label>送料（タップ）</label>
+      <div class="btnrow">
+        <button class="small" data-ship="210">210</button>
+        <button class="small" data-ship="450">450</button>
+        <button class="small" data-ship="750">750</button>
+        <button class="small" data-ship="850">850</button>
+        <button class="small ghost" id="shipReset">送料リセット</button>
+      </div>
+      <div class="muted">選択中送料：<span id="shipLabel" class="mono">未選択</span></div>
+
+      <details>
+        <summary>売れた価格（3件）※初回だけ入力すればOK</summary>
+        <div class="row">
+          <div><label>売値①</label><input id="p1" inputmode="numeric" placeholder="例：980" /></div>
+          <div><label>売値②</label><input id="p2" inputmode="numeric" placeholder="例：900" /></div>
+          <div><label>売値③</label><input id="p3" inputmode="numeric" placeholder="例：880" /></div>
+        </div>
+        <div class="muted">※保存済みなら、ここは空でOK（保存された中央値を使います）</div>
+      </details>
+
+      <div class="btnrow">
+        <button class="primary" id="evalBtn">判定する</button>
+        <button id="saveBtn">この本を保存/更新</button>
+        <button class="ghost" id="clearBtn">入力クリア</button>
+      </div>
+
+      <div style="margin-top:12px;">
+        <span id="decisionPill" class="pill" style="display:none;"></span>
+      </div>
+      <div id="result" class="muted" style="margin-top:10px;"></div>
+
+      <details>
+        <summary>判定ルール（変更したいとき）</summary>
+        <div class="muted">
+          <div>販売手数料：<span class="mono">10%</span></div>
+          <div>状態係数：A=<span class="mono">1.00</span> / B=<span class="mono">0.92</span> / C=<span class="mono">0.85</span></div>
+          <div>🟢GO：利益 <span class="mono">300円以上</span> / 🟡保留：<span class="mono">0〜299円</span> / 🔴見送り：<span class="mono">赤字</span></div>
+          <div style="margin-top:6px;">※必要なら後で、この数値は自由に調整できます。</div>
+        </div>
+      </details>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>保存した本（検索）</label>
+          <input id="q" placeholder="題名で検索" />
+        </div>
+        <div style="display:flex; align-items:end; gap:10px;">
+          <button id="refreshBtn">更新</button>
+          <button class="ghost" id="wipeBtn"><span class="danger">全消去</span></button>
+        </div>
+      </div>
+
+      <div id="list" class="list"></div>
+      <div class="muted" style="margin-top:8px;">
+        ※データはこのiPhone内に保存されます（クラウド同期なし）
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./app.js"></script>
 </body>
 </html>
